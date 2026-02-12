@@ -1,0 +1,5 @@
+Level 00 teaches ONE core mistake:
+
+❌ Storing secrets in readable files
+❌ Using obfuscation instead of real security
+✅ Attackers will always reverse simple encodings

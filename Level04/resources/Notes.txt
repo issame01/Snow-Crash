@@ -1,0 +1,47 @@
+Vulnerability: OS Command Injection (CGI)
+
+Definition:
+OS Command Injection occurs when an application executes operating system commands using unsanitized user input, allowing an attacker to execute arbitrary commands with the privileges of the vulnerable process.
+
+Vulnerable Code:
+print `echo $y 2>&1`;
+
+Explanation:
+- The CGI Perl script takes user input from the HTTP parameter 'x'
+- This input is directly passed to a shell command using backticks
+- Shell metacharacters are interpreted
+- The script runs as the user 'flag04'
+
+How the Exploit Works:
+1. The attacker controls the 'x' parameter via HTTP requests.
+2. Special characters are URL-encoded to bypass local shell parsing.
+3. The CGI decodes the input and executes it in a shell.
+4. Injected commands run with the privileges of 'flag04'.
+5. The 'getflag' command succeeds and prints the token.
+
+Why URL Encoding Was Needed:
+- Characters like ';' are interpreted by the local shell.
+- Encoding ';' as '%3B' ensures it reaches the server intact.
+- The server decodes '%3B' back to ';' before execution.
+
+Commands Used:
+
+View the script:
+cat level04.pl
+
+Test injection (fails locally):
+curl "http://localhost:4747/?x=hello;whoami"
+
+Successful injection (URL-encoded):
+curl "http://localhost:4747/?x=hello%3Bwhoami"
+
+Retrieve the flag:
+curl "http://localhost:4747/?x=hello%3Bgetflag"
+
+Privilege Context:
+- Local shell user: level04
+- CGI script user: flag04
+- Injected command user: flag04
+
+Key Security Lesson:
+Never execute user-controlled input in a shell, especially in privileged processes.

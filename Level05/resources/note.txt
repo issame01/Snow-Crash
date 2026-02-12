@@ -1,0 +1,4 @@
+/opt/openarenaserver
+
+level05@SnowCrash:/var/mail$ cat level05 
+*/2 * * * * su -c "sh /usr/sbin/openarenaserver" - flag05

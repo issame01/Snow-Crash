@@ -1,0 +1,53 @@
+Vulnerability type:
+
+- Sensitive data exposure
+- Improper password storage
+- Broken authentication configuration
+
+Note: This is an Old-school UNIX mistake. Normally, modern Linux systems look like this==> username:x:UID:GID:...
+
+The x means: The real password hash is stored in /etc/shadow (root-only)
+But in our case, flag01 has a hash directly in /etc/passwd, which is world-readable. ===> flag01:42hDRfypTqqnw:3001:3001::/home/flag/flag01:/bin/bash
+This is a classic misconfiguration vulnerability.
+
+
+What is 42hDRfypTqqnw?
+
+This string is a DES-based Unix password hash, identifiable by its length (13 chars)
+
+- crackable offline
+- No bruteforcing the system.
+
+
+
+Step: 1
+    echo 'flag01:42hDRfypTqqnw' > flag01.hash
+
+Step: 2
+    john flag01.hash
+
+Created directory: /home/issame/.john
+Using default input encoding: UTF-8
+Loaded 1 password hash (descrypt, traditional crypt(3) [DES 256/256 AVX2])
+Will run 8 OpenMP threads
+Proceeding with single, rules:Single
+Press 'q' or Ctrl-C to abort, almost any other key for status
+Almost done: Processing the remaining buffered candidate passwords, if any.
+Warning: Only 642 candidates buffered for the current salt, minimum 2048 needed for performance.
+Proceeding with wordlist:/usr/share/john/password.lst
+abcdefg          (flag01)     
+1g 0:00:00:00 DONE 2/3 (2026-02-05 18:07) 33.33g/s 1681Kp/s 1681Kc/s 1681KC/s 123456..lucky0
+Use the "--show" option to display all of the cracked passwords reliably
+Session completed. 
+
+
+We can see the the hash crack is: abcdefg
+
+
+Summary:
+
+The system was misconfigured: the password hash of flag01 was stored in /etc/passwd instead of /etc/shadow. 
+Since /etc/passwd is world-readable, I extracted the DES hash and cracked it offline using John the Ripper.
+
+
+

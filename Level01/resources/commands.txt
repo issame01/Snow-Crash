@@ -1,0 +1,3 @@
+cat /etc/passwd
+echo 'flag01:42hDRfypTqqnw' > flag01.hash
+john flag01.hash

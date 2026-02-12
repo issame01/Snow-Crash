@@ -1,0 +1,5 @@
+find / -user flag00 2>/dev/null
+cat /usr/sbin/john
+tr 'a-z' 'n-za-m'
+su flag00
+getflag
