@@ -1,0 +1,7 @@
+Time-of-Check to Time-of-Use (TOCTOU) Race
+
+
+
+access() only checks at the moment you call it.
+
+If an attacker can modify the filesystem between the check and when you actually open/use the file, they can trick your program.

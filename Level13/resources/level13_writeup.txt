@@ -1,0 +1,80 @@
+SnowCrash – Level13 Write-Up
+
+Objective
+
+Retrieve the token for level14 by analyzing and bypassing protections
+inside the level13 binary file.
+
+Step 1 – Initial Inspection
+
+Using the strings command on the binary reveals interesting information:
+
+-   getuid
+-   “UID %d started us but we we expect %d”
+-   “your token is %s”
+
+This suggests that the program checks the user ID using getuid(), compares it to an expected value, and prints a token if the condition is satisfied.
+
+Step 2 – Disassembly
+
+We load the binary into gdb and disassemble main:
+
+    gdb ./level13
+    disas main
+
+Relevant assembly:
+
+    call   getuid@plt
+    cmp    $0x1092,%eax
+    je     success
+
+0x1092 in hexadecimal equals 4242 in decimal. Therefore, the program
+expects the UID to be 4242.
+
+If the UID does not match, the program prints an error and exits.
+
+Vulnerability: 
+    The protection mechanism is implemented as:
+
+    if (getuid() != 4242)
+        exit(1);
+
+This is a user-space authorization check. Since the program runs under
+our user, we can control its execution using a debugger. This creates a
+logic flaw that allows authentication bypass via runtime manipulation.
+
+Exploitation:
+    On 32-bit x86 Linux, function return values are stored in the EAX
+    register. Since getuid() returns its value in EAX, we can modify EAX
+    before the comparison.
+
+Steps:
+1.  Set a breakpoint after getuid(): b *0x0804859a run
+2.  Inspect EAX: info registers eax
+    It contains our real UID (e.g., 2013).
+3.  Overwrite EAX: set $eax = 4242
+4.  Continue execution: continue
+
+
+The comparison now becomes:
+    cmp 4242, 4242
+
+The Zero Flag is set, the jump is taken, and the success branch executes.
+
+Result:
+The program prints: your token is 2A31L79asukciNyi8uppkEuSx
+
+
+Concepts Learned:
+    -   Reverse engineering using disassembly
+    -   Understanding calling conventions (return value in EAX)
+    -   Control flow manipulation
+    -   Authentication bypass via runtime register modification
+    -   Weakness of user-space authorization checks
+
+Conclusion:
+    Level13 demonstrates how relying on local user-space checks for security
+    is ineffective. If an attacker controls execution of the process, they
+    can manipulate registers and bypass logic.
+
+    This challenge is a clear example of dynamic reverse engineering leading to a logic bypass.
