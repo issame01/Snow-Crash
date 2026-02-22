@@ -1,0 +1,130 @@
+Level02 - Packet Capture Analysis Write-up
+
+Challenge Overview Level: 02 Vulnerability Type: Cleartext Protocol
+Analysis / Network Sniffing Tools Used: tcpdump, terminal, text analysis
+
+Challenge Description In this challenge, we are provided with a packet
+capture file (level02.pcap) containing network traffic that needs to be
+analyzed to extract a password. The traffic captures a telnet session
+where a user attempts to log in to a remote system.
+
+Methodology
+
+1.  Initial Analysis First, we examine the packet capture file using
+    tcpdump:
+
+tcpdump -r level02.pcap -n > /tmp/file.txt
+
+The -n flag prevents DNS resolution, keeping IP addresses in numeric
+form for cleaner output.
+
+2.  Understanding the Traffic Examining the output reveals a telnet
+    session (port 12121) between two hosts:
+
+Client: 59.233.235.218 Server: 59.233.235.223
+
+The session shows:
+
+-   TCP three-way handshake
+-   Terminal type negotiation
+-   Login prompt (wwwbugs login:)
+-   Password prompt
+-   Failed login attempt (Login incorrect)
+
+3.  Extracting the Username After the login prompt, we find packets with
+    length 1 from the client:
+
+06:23:24.491452 - ‘l’ 06:23:24.591456 - ‘e’ 06:23:24.821113 - ‘v’
+06:23:24.911733 - ‘e’ 06:23:24.981645 - ‘l’
+
+Username: level
+
+4.  Extracting the Password After the “Password:” prompt, we identify
+    all client packets with length 1 and extract their data:
+
+06:23:34.363418 - ‘f’ 06:23:35.253053 - ‘t’ 06:23:35.873401 - ’_’
+06:23:36.343811 - ‘w’ 06:23:36.573585 - ‘a’ 06:23:36.803330 - ‘n’
+06:23:36.943261 - ‘d’ 06:23:37.283708 - ‘r’ 06:23:38.864101 - ‘.’
+(non-printable - backspace) 06:23:39.233935 - ‘.’ (non-printable -
+backspace) 06:23:39.604364 - ‘.’ (non-printable - backspace)
+06:23:40.374542 - ‘N’ 06:23:40.574439 - ‘D’ 06:23:42.264451 - ‘R’
+06:23:43.574954 - ‘e’ 06:23:44.014684 - ‘l’ 06:23:44.635281 - ‘.’
+(non-printable - backspace) 06:23:44.805020 - ‘L’ 06:23:45.074939 - ‘0’
+06:23:45.104894 - ‘L’ 06:23:45.965233 - ‘.’ (Enter key)
+
+5.  Interpreting Special Characters Critical Insight: The dots (.) in
+    tcpdump’s ASCII output represent non-printable characters. In a
+    terminal session, these are typically:
+
+-   Backspace (ASCII 8) - deletes the previous character
+-   Enter/Return (ASCII 13) - submits the input
+
+By interpreting the dots as backspace operations, we can reconstruct
+what the user actually typed:
+
+Typing sequence with backspaces applied:
+
+Types: f t _ w a n d r → ft_wandr Backspace 3 times → deletes r, d, n →
+now ft_wa Types: N D R e l → ft_waNDRel Backspace once → deletes l → now
+ft_waNDRe Types: L 0 L → ft_waNDReL0L Enter key → submits password
+
+6.  The Password
+
+Final password: ft_waNDReL0L
+
+Vulnerability Analysis
+
+The Core Vulnerability: Cleartext Transmission
+
+This challenge demonstrates the fundamental security issue of
+transmitting sensitive data in cleartext over a network.
+
+Protocol Vulnerabilities:
+
+-   Telnet Protocol - Transmits all data, including passwords, as
+    plaintext
+-   Lack of Encryption - No SSL/TLS or SSH encryption
+-   Session Sniffing - Any attacker with network access can capture and
+    read all traffic
+
+Why This is Dangerous:
+
+-   Passive sniffing - Attackers don’t need to actively intercept; they
+    can just listen
+-   No forward secrecy - If captured, passwords are permanently
+    compromised
+-   Credential reuse - Users often reuse passwords across services
+
+Mitigation Strategies:
+
+-   Use encrypted protocols (SSH instead of Telnet)
+-   Implement TLS/SSL for all network communications
+-   Use VPNs for sensitive connections
+-   Network segmentation to limit access to sensitive traffic
+-   Regular security audits including packet capture analysis
+
+Learning Outcomes
+
+This challenge teaches several important security concepts:
+
+-   Network sniffing - How attackers can capture network traffic
+-   Protocol analysis - Understanding TCP/IP and application protocols
+-   Data extraction - Techniques for recovering information from packet
+    captures
+-   Special character interpretation - Understanding non-printable
+    characters in network data
+-   Cleartext dangers - Why encryption is essential for all sensitive
+    communications
+
+Solution Summary
+
+The password for level02 is ft_waNDReL0L, extracted by:
+
+-   Analyzing the telnet session in the packet capture
+-   Identifying packets containing keystrokes (length 1)
+-   Extracting ASCII characters from packet payloads
+-   Interpreting non-printable characters (dots) as backspace operations
+-   Reconstructing the final password after all corrections
+
+This password can then be used to access the next level in the challenge
+series.

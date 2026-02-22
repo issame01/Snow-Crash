@@ -1,0 +1,136 @@
+SnowCrash – Level07 Write-Up
+============================
+
+Goal
+----
+Exploit the SUID binary `level07` to retrieve the token for the next level.
+
+Step 1 – Binary Analysis
+------------------------
+Running `strings level07` reveals important functions:
+
+    getenv
+    asprintf
+    system
+    setresuid
+    setresgid
+    /bin/echo %s
+    LOGNAME
+
+This immediately suggests:
+- The program reads an environment variable (LOGNAME)
+- It builds a string using asprintf
+- It executes that string using system()
+
+Since the binary is SUID, any command executed via system() runs
+with elevated privileges (flag07 user).
+
+Step 2 – Understanding the Logic
+--------------------------------
+
+The code likely behaves like this:
+
+    char *buffer;
+    char *name = getenv("LOGNAME");
+    asprintf(&buffer, "/bin/echo %s", name);
+    system(buffer);
+
+Explanation:
+- getenv("LOGNAME") retrieves the environment variable.
+- asprintf builds a shell command string.
+- system() executes the string via /bin/sh.
+
+The critical mistake:
+User-controlled input is passed directly into system() without sanitization.
+
+Step 3 – Identifying the Vulnerability
+--------------------------------------
+
+The vulnerability is:
+
+    OS Command Injection via Environment Variable(Environment Variable Command Injection)
+
+
+Because:
+- LOGNAME is attacker-controlled.
+- system() executes the command through a shell.
+- Shell metacharacters are interpreted.
+
+This allows arbitrary command execution.
+
+Step 4 – Exploitation
+---------------------
+
+Set a malicious LOGNAME value:
+
+    export LOGNAME="; getflag"
+
+Run the binary:
+
+    ./level07
+
+Internally, the program executes:
+
+    /bin/echo ; getflag
+
+The shell interprets this as:
+1. Run /bin/echo
+2. Then run getflag
+
+Since the binary is SUID, getflag runs as flag07.
+
+Result:
+    Check flag.Here is your token : <token_value>
+
+Token successfully retrieved.
+
+Why This Works
+--------------
+
+system() executes commands using:
+
+    /bin/sh -c "command"
+
+The semicolon (;) is a shell command separator.
+Anything after it is executed as a new command.
+
+Because the input is not sanitized or escaped,
+the attacker controls the full shell execution flow.
+
+Root Cause
+----------
+
+- Using system() with unsanitized user input.
+- Trusting environment variables in a SUID program.
+- Lack of input validation.
+
+Vulnerability Type
+------------------
+
+OS Command Injection
+Specifically:
+Environment Variable Command Injection in a SUID binary.
+
+Security Impact
+---------------
+
+- Arbitrary command execution
+- Privilege escalation
+- Complete compromise of the SUID user account
+
+Proper Fix
+----------
+
+Avoid system() with user-controlled input.
+Use execve() with argument arrays instead:
+
+    execl("/bin/echo", "echo", name, NULL);
+
+Or strictly sanitize and escape input before execution.
+
+Conclusion
+----------
+
+Level07 is vulnerable to OS Command Injection because it passes
+an attacker-controlled environment variable into system() without
+sanitization, allowing privilege escalation to flag07.

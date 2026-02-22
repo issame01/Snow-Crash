@@ -1,0 +1,211 @@
+Snow Crash – Level05 Pro Writeup (Baby-Guided)
+Objective
+
+Exploit a scheduled task running as another user to execute arbitrary commands and retrieve the next level’s token.
+
+Step 1 – Notice Something Suspicious
+
+After logging in:
+
+You have new mail.
+
+That’s not random. Always check mail.
+
+ls /var/mail/
+cat /var/mail/level05
+
+You find:
+
+*/2 * * * * su -c "sh /usr/sbin/openarenaserver" - flag05
+What Does This Mean?
+
+Let’s decode it:
+
+*/2 * * * *
+
+→ Runs every 2 minutes.
+
+su -c "sh /usr/sbin/openarenaserver" - flag05
+
+→ Execute /usr/sbin/openarenaserver
+→ As user flag05
+
+So every 2 minutes, a script runs as flag05.
+
+That’s your entry point.
+
+Step 2 – Inspect the Executed Script
+ls -la /usr/sbin/openarenaserver
+
+Output:
+
+-rwxr-x---+ 1 flag05 flag05 ...
+
+Owned by flag05.
+
+Now read it:
+
+cat /usr/sbin/openarenaserver
+
+Script content:
+
+#!/bin/sh
+
+for i in /opt/openarenaserver/* ; do
+    (ulimit -t 5; bash -x "$i")
+    rm -f "$i"
+done
+
+Break This Down Carefully
+
+This script:
+
+Loops over everything inside:
+
+/opt/openarenaserver/
+
+Executes each file with:
+
+bash -x "$i"
+
+Deletes it afterward:
+
+rm -f "$i"
+
+Important question:
+
+Can we write inside /opt/openarenaserver/?
+
+Step 3 – Test Directory Permissions
+ls -ld /opt/openarenaserver
+
+If writable by level05, that’s game over (in a good way).
+
+Because:
+
+Whatever we place there
+Will be executed
+As user flag05
+Every 2 minutes
+
+That’s privilege escalation.
+
+Step 4 – Exploitation Strategy
+
+We control the input directory.
+
+The cron job executes everything in it.
+
+So we create a malicious script.
+
+Create a script:
+
+cat /tmp/script.sh
+
+Content:
+
+whoami > /tmp/flag.txt
+getflag >> /tmp/flag.txt
+
+What this does:
+
+whoami → shows which user executes it
+
+getflag → retrieves the token
+
+Output goes to /tmp/flag.txt (a readable location)
+
+Step 5 – Drop the Payload
+
+Copy it into the watched directory:
+
+cp -f /tmp/script.sh /opt/openarenaserver/
+
+Now wait ~2 minutes.
+
+Why wait?
+
+Because the cron runs:
+
+*/2 * * * *
+
+Step 6 – Retrieve the Result
+
+After it runs:
+
+cat /tmp/flag.txt
+
+You should see:
+
+flag05
+Check flag.Here is your token : viuaaale9huek52boumoomioc
+
+Boom.
+
+You executed commands as flag05.
+
+Why This Works
+
+Because:
+
+A cron job runs as flag05
+
+It executes every file inside /opt/openarenaserver/
+
+That directory is writable by level05
+
+No validation is performed
+
+No ownership check
+
+No restriction
+
+This is a classic:
+
+- Insecure Scheduled Task
+- Writable Execution Directory
+- Privilege Escalation
+
+Real Security Concept
+
+This is called:
+
+Cron-based privilege escalation via writable execution path
+
+In real systems this happens when:
+
+Backup scripts are writable
+
+Deployment folders are writable
+
+Automation jobs execute attacker-controlled files
+
+This is extremely common in misconfigured Linux environments.
+
+Mental Model To Remember
+
+Think of it like this:
+
+The system says:
+
+"Every 2 minutes, I will execute whatever is inside this folder."
+
+And you say:
+
+"Cool. I’ll decide what’s inside that folder."
+
+That’s control.
+
+Skills You Practiced
+
+Reading cron jobs
+
+Understanding su -c
+
+Inspecting ownership and permissions
+
+Exploiting writable execution paths
+
+Privilege escalation logic
+
+This is real-world Linux privesc knowledge.

@@ -1,0 +1,96 @@
+===============================
+SnowCrash – Level00 Write-Up
+===============================
+
+Objective
+---------
+Gain access to the `flag00` user account and retrieve the flag.
+
+--------------------------------------------------
+
+Step 1 – Enumeration
+
+We began by searching the entire filesystem for files owned by the user `flag00`:
+
+    find / -user flag00 2>/dev/null
+
+Explanation:
+- -user flag00 → search for files owned by flag00
+- 2>/dev/null → suppress permission denied errors
+
+This revealed the following file:
+
+    /usr/sbin/john
+
+--------------------------------------------------
+
+Step 2 – Inspecting the File
+
+We examined the contents of the file:
+
+    cat /usr/sbin/john
+
+The file contained:
+
+    cdiiddwpgswtgt
+
+This appeared to be encoded text rather than plaintext.
+
+--------------------------------------------------
+
+Step 3 – Identifying the Cipher
+
+The structure of the string suggested a Caesar cipher.
+
+After testing shifts, we determined it was encoded using a shift of +15.
+
+To decode a Caesar cipher shifted by +15, we apply a +11 shift:
+
+    D(x) = (x - 15) mod 26
+
+--------------------------------------------------
+
+Step 4 – Decoding the String
+
+We decoded the string using `tr`:
+
+    echo "cdiiddwpgswtgt" | tr 'a-z' 'lmnopqrstuvwxyzabcdefghijk'
+
+Output:
+
+    nottoohardhere
+
+--------------------------------------------------
+
+Step 5 – Switching User
+
+We used the decoded string as the password for the flag00 account:
+
+    su flag00
+
+Password:
+    nottoohardhere
+
+--------------------------------------------------
+
+Step 6 – Retrieving the Flag
+
+After successfully switching users, we executed:
+
+    getflag
+
+This returned the Level00 flag.
+
+--------------------------------------------------
+
+concept we learnt from this challenge:
+--------------------------------------
+
+- Enumeration is critical in CTF challenges.
+- Suppressing errors improves readability.
+- Beginner challenges often use simple encodings like Caesar cipher.
+- Always test common cipher shifts before assuming complexity.
+
+--------------------------------------------------
+
+Level00 successfully completed.
