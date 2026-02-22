@@ -1,0 +1,101 @@
+SnowCrash – Level14 Write-up
+
+Objective
+
+The goal of Level14 is to retrieve the final token using the getflag
+binary. However, the program includes an anti-debugging mechanism to
+prevent analysis.
+
+Binary Analysis
+
+The getflag binary performs two important checks:
+
+1.  It calls ptrace(PTRACE_TRACEME).
+    -   If the program is already being debugged, ptrace fails.
+    -   If not debugged, ptrace succeeds.
+2.  It checks the return value stored in the EAX register.
+    -   If ptrace failed → the program exits.
+    -   If ptrace succeeded → execution continues.
+
+This is a classic anti-debugging technique.
+
+Understanding the Protection
+
+Linux only allows one tracer per process. Since GDB uses ptrace
+internally, running the program inside GDB causes the ptrace call inside
+the program to fail.
+
+The program then checks EAX:
+
+    test eax, eax
+    je   success_path
+
+If EAX is zero → success. If EAX is non-zero → failure.
+
+Bypassing the Protection
+
+We used GDB to manipulate execution flow.
+
+Steps:
+
+1.  Set a breakpoint before the check: b *0x0804898e
+
+2.  When the breakpoint hits, force: set $eax=0
+
+3.  Continue execution.
+
+
+b *0x0804898e
+commands
+set $eax=0
+continue
+end
+
+This makes the program believe ptrace succeeded, even though it failed.
+
+then we did an other breakpoint at call funtion <getuid@plt>
+b *0x080484b0
+run
+
+When it stops at:
+    0x080484b0 in getuid@plt ()
+
+Type:
+    return (int)3014
+    continue
+
+Result
+
+After bypassing the anti-debug check and fake the return value of getuid(), 
+the program prints:
+
+    Check flag. Here is your token:
+    7QiHafiNa3HVozsaXkawuYrTstxbpABHD8CPnHJ
+
+Then we switched to user flag14 and executed:
+
+    su flag14
+    getflag
+
+Which returned the same token.
+
+Security Lesson
+
+This level demonstrates:
+
+-   Anti-debugging is not strong security.
+-   If an attacker controls execution, they can manipulate checks.
+-   Real secure systems rely on cryptography and server-side validation,
+    not client-side protections.
+
+Conclusion
+
+Level14 teaches a critical security principle:
+
+Client-side protections are weak if the attacker controls execution.
+
+By understanding assembly, registers, and debugging tools, we
+successfully bypassed the anti-debug mechanism and retrieved the final
+token.
+
+End of Level14.
